@@ -1,0 +1,11 @@
+[package]
+name = "pimpf"
+version = "0.1.0"
+edition = "2024"
+authors = ["TornaxO7 <tornax@pm.me>"]
+description = "A compiler for the c0 programming language of the `Compiler Design` lecture."
+license = "GPL-2.0"
+repository = "https://github.com/TornaxO7/pimpf"
+publish = false
+
+[dependencies]
