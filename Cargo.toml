@@ -9,6 +9,7 @@ repository = "https://github.com/TornaxO7/pimpf"
 publish = false
 
 [dependencies]
+ariadne = "0.5"
 tree-sitter = "0.25"
 tree-sitter-l1 = { git = "https://github.com/TornaxO7/tree-sitter-l1" }
 

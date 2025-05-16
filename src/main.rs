@@ -1,13 +1,22 @@
-use tree_sitter::Parser;
+use std::path::PathBuf;
 
 fn main() {
-    let mut parser = Parser::new();
-    parser
-        .set_language(&tree_sitter_l1::LANGUAGE.into())
-        .unwrap();
+    let (source_code, dest_path) = parse_args();
+}
 
-    let source_code = "int main() { return 0;";
-    let tree = parser.parse(source_code, None).unwrap();
+fn parse_args() -> (String, PathBuf) {
+    let mut args = std::env::args();
+    if args.len() < 3 {
+        panic!("Only got {} arguments but required 3.", args.len());
+    }
 
-    println!("{:?}", tree);
+    // skip the program name
+    args.next().unwrap();
+
+    let source_code = {
+        let source_path = args.next().unwrap();
+        std::fs::read_to_string(source_path).unwrap()
+    };
+
+    (source_code, PathBuf::from(args.next().unwrap()))
 }
