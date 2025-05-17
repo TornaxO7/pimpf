@@ -18,6 +18,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 tree-sitter = "0.25"
 tree-sitter-l1 = { git = "https://github.com/TornaxO7/tree-sitter-l1" }
+baz-tree-sitter-traversal = "0.1"
 
 [build-dependencies]
 cc = "*"

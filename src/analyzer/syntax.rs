@@ -7,7 +7,7 @@ use crate::parser::ParsedSource;
 
 #[derive(thiserror::Error, Debug)]
 #[error("{0}")]
-pub struct SyntaxError(pub String); // contains message
+pub struct SyntaxError(pub super::ErrorMsg);
 
 pub fn analyze(source: &ParsedSource) -> Result<()> {
     let node = source.ast().root_node();
@@ -35,11 +35,11 @@ pub fn analyze(source: &ParsedSource) -> Result<()> {
 fn collect_errors<'a>(
     source: &'a ParsedSource,
 ) -> Vec<ariadne::Report<'a, std::ops::Range<usize>>> {
-    let mut cursor = source.ast().walk();
     let mut reports = Vec::new();
+    let traverser =
+        tree_sitter_traversal::traverse_tree(source.ast(), tree_sitter_traversal::Order::Pre);
 
-    'tree_traversal: loop {
-        let node = cursor.node();
+    for node in traverser {
         if node.is_error() {
             let report = source
                 .report(ariadne::ReportKind::Error, node.byte_range())
@@ -64,28 +64,8 @@ fn collect_errors<'a>(
 
             reports.push(report);
         }
-
-        // move to next node
-
-        if cursor.goto_first_child() {
-            continue;
-        }
-
-        if cursor.goto_next_sibling() {
-            continue;
-        }
-
-        'up_traversal: loop {
-            if cursor.goto_parent() {
-                if cursor.goto_next_sibling() {
-                    break 'up_traversal;
-                }
-            } else {
-                // we are back at the root
-                break 'tree_traversal;
-            }
-        }
     }
+
     reports
 }
 
@@ -105,14 +85,13 @@ mod tests {
     }
 
     #[test]
-    fn missing_equal_sign() -> Result<()> {
+    fn missing_equal_sign() {
         crate::init_color_eyre();
 
         let source = "int main() { int a 10; return 0; }";
         let ast = crate::parser::parse(source);
 
-        // assert!(super::analyze(&ast).is_err());
-        super::analyze(&ast)
+        assert!(super::analyze(&ast).is_err());
     }
 
     #[test]

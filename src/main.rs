@@ -1,5 +1,6 @@
 mod analyzer;
 mod parser;
+mod util;
 
 use std::path::PathBuf;
 
