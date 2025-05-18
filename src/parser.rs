@@ -11,10 +11,9 @@ pub struct ParsedSource {
 impl ParsedSource {
     pub fn report<'a>(
         &'a self,
-        kind: ariadne::ReportKind<'a>,
         range: std::ops::Range<usize>,
     ) -> ariadne::ReportBuilder<'a, std::ops::Range<usize>> {
-        ariadne::Report::build(kind, range)
+        ariadne::Report::build(ariadne::ReportKind::Error, range)
     }
 
     pub fn source(&self) -> &ariadne::Source {

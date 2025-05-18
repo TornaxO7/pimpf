@@ -35,6 +35,7 @@ pub fn analyze(source: &ParsedSource) -> Result<()> {
 fn collect_errors<'a>(
     source: &'a ParsedSource,
 ) -> Vec<ariadne::Report<'a, std::ops::Range<usize>>> {
+    // TODO: Probier das mal mit queries aus
     let mut reports = Vec::new();
     let traverser =
         tree_sitter_traversal::traverse_tree(source.ast(), tree_sitter_traversal::Order::Pre);
@@ -42,7 +43,7 @@ fn collect_errors<'a>(
     for node in traverser {
         if node.is_error() {
             let report = source
-                .report(ariadne::ReportKind::Error, node.byte_range())
+                .report(node.byte_range())
                 .with_message("Syntax error")
                 .with_label(
                     ariadne::Label::new(node.byte_range())
@@ -54,7 +55,7 @@ fn collect_errors<'a>(
             reports.push(report);
         } else if node.is_missing() {
             let report = source
-                .report(ariadne::ReportKind::Error, node.byte_range())
+                .report(node.byte_range())
                 .with_label(
                     ariadne::Label::new(node.byte_range())
                         .with_message(format!("'{}' is missing", node.kind()))
