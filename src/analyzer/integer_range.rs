@@ -67,7 +67,7 @@ fn collect_errors<'a>(
 
                 Err(err) => {
                     let report = source
-                        .report(ariadne::ReportKind::Error, node.byte_range())
+                        .report(node.byte_range())
                         .with_message(format!("{}", err))
                         .with_label(
                             ariadne::Label::new(node.byte_range())
@@ -90,7 +90,7 @@ mod tests {
     use color_eyre::eyre::Result;
 
     #[test]
-    fn max_int() -> Result<()> {
+    fn max_dec_int() -> Result<()> {
         crate::init_color_eyre();
 
         let source = crate::parser::parse("int main() { return 2147483648; }");
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn min_int() -> Result<()> {
+    fn min_dec_int() -> Result<()> {
         crate::init_color_eyre();
 
         let source = crate::parser::parse("int main() { return -2147483648; }");
@@ -106,7 +106,7 @@ mod tests {
     }
 
     #[test]
-    fn too_big_int() {
+    fn too_big_dec_int() {
         crate::init_color_eyre();
 
         let source = crate::parser::parse("int main() { return 2147483649; }");
@@ -114,10 +114,43 @@ mod tests {
     }
 
     #[test]
-    fn too_small_int() {
+    fn too_small_dec_int() {
         crate::init_color_eyre();
 
         let source = crate::parser::parse("int main() { return -2147483649; }");
         assert!(super::analyze(&source).is_err());
+    }
+
+    // == hex ==
+
+    #[test]
+    fn max_hex_int_with_small_x() -> Result<()> {
+        crate::init_color_eyre();
+
+        let source = crate::parser::parse("int main() { return 0x0; }");
+        super::analyze(&source)
+    }
+
+    #[test]
+    fn min_hex_int_with_small_x() -> Result<()> {
+        crate::init_color_eyre();
+
+        let source = crate::parser::parse("int main() { return -0x0; }");
+        super::analyze(&source)
+    }
+    #[test]
+    fn max_hex_int_with_big_x() -> Result<()> {
+        crate::init_color_eyre();
+
+        let source = crate::parser::parse("int main() { return 0X0; }");
+        super::analyze(&source)
+    }
+
+    #[test]
+    fn min_hex_int_with_big_x() -> Result<()> {
+        crate::init_color_eyre();
+
+        let source = crate::parser::parse("int main() { return -0X0; }");
+        super::analyze(&source)
     }
 }
