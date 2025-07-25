@@ -1,3 +1,6 @@
+mod grammar;
+mod parser;
+
 fn main() {
-    println!("Let's go");
+    parser::parse("");
 }

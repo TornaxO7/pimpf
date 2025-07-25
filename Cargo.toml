@@ -9,7 +9,7 @@ repository = "https://github.com/TornaxO7/pimpf"
 publish = false
 
 [dependencies]
-
+chumsky = "0.10"
 
 [build-dependencies]
 cc = "*"
