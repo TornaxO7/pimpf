@@ -9,16 +9,7 @@ repository = "https://github.com/TornaxO7/pimpf"
 publish = false
 
 [dependencies]
-ariadne = "0.5"
-color-eyre = "0.6"
-thiserror = "2"
 
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-tree-sitter = "0.25"
-tree-sitter-l1 = { git = "https://github.com/TornaxO7/tree-sitter-l1" }
-baz-tree-sitter-traversal = "0.1"
 
 [build-dependencies]
 cc = "*"
