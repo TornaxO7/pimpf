@@ -3,6 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    crow.url = "github:I-Al-Istannen/crow";
   };
 
   outputs = inputs@{ flake-parts, ... }:
@@ -27,7 +28,7 @@
               rust-toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
             in
             pkgs.mkShell {
-              packages = [ rust-toolchain ];
+              packages = [ rust-toolchain ] ++ [ inputs.crow.packages.${system}.client ];
             };
         };
       };
