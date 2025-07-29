@@ -42,14 +42,16 @@ pub enum LValue<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression<'a> {
-    Exp(Box<Expression<'a>>),
+    NestedExp(Box<Expression<'a>>),
     Intconst(Intconst<'a>),
     Ident(Identifier<'a>),
+
     Binop {
         left: Box<Expression<'a>>,
         op: BinOperation,
         right: Box<Expression<'a>>,
     },
+
     Unop {
         op: UnOperation,
         right: Box<Expression<'a>>,
