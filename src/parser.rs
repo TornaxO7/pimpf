@@ -33,6 +33,8 @@ const KEYWORDS: &[&str] = &[
     "string",
 ];
 
+const WHITESPACE: &str = " ";
+
 pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, char>> {
     parser().parse(code)
 }
@@ -40,12 +42,14 @@ pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, cha
 fn parser<'src>() -> parser!('src, Program<'src>) {
     just("int")
         .ignored()
-        .padded()
-        .then_ignore(just("main").padded())
-        .then_ignore(just("()").padded())
+        .then_ignore(just(WHITESPACE).repeated().at_least(1))
+        .then_ignore(just("main"))
+        .then_ignore(just("(").padded())
+        .then_ignore(just(")").padded())
         .then_ignore(just("{").padded())
         .then(statements_parser())
         .then_ignore(just("}").padded())
+        .then_ignore(end().padded())
         .map(|(_main_type, statements)| Program(statements))
 }
 
@@ -189,7 +193,7 @@ fn exp_parser<'src>() -> parser!('src, Expression<'src>) {
             )
         };
 
-        choice((prec1, prec2, prec3, prec4))
+        prec1
     })
 }
 
@@ -197,7 +201,7 @@ fn intconst_parser<'src>() -> parser!('src, Intconst<'src>) {
     let dec = decnum_parser().map(|d| Intconst::Decnum(d));
     let hex = hexnum_parser().map(|h| Intconst::Hexnum(h));
 
-    choice((dec, hex)).padded()
+    choice((hex, dec)).padded()
 }
 
 fn unop_parser<'src>() -> impl Parser<'src, &'src str, UnOperation, ParseError<'src>> {
@@ -233,24 +237,21 @@ fn ident_parser<'src>() -> parser!('src, Identifier<'src>) {
     ))
     .repeated();
 
-    prefix
-        .then(suffix)
-        .padded()
-        .to_slice()
-        .try_map(|ident: &str, span| {
-            if KEYWORDS.contains(&ident) {
-                Err(Rich::custom(span, "nein. doch. oh."))
-            } else {
-                Ok(Identifier(ident))
-            }
-        })
+    prefix.then(suffix).to_slice().try_map(|ident: &str, span| {
+        if KEYWORDS.contains(&ident) {
+            Err(Rich::custom(span, "nein. doch. oh."))
+        } else {
+            Ok(Identifier(ident))
+        }
+    })
 }
 
 fn decnum_parser<'src>() -> parser!('src, Decnum<'src>) {
-    let decnum = one_of('1'..'9')
+    let decnum = one_of('1'..='9')
         .then(one_of('0'..='9').repeated())
         .to_slice()
         .map(|dec| Decnum(dec));
+
     let just_zero = just("0").map(|z| Decnum(z));
 
     choice((decnum, just_zero)).padded()
@@ -409,5 +410,25 @@ mod tests {
 
     // == sandbox
     #[test]
-    fn sandbox() {}
+    fn sandbox() {
+        panic!(
+            "{:#?}",
+            parser()
+                .parse(
+                    "int main() {
+          int a = 0;
+          int x = 0;
+          int y = 0;
+          int z = 0;
+          (a) = 6;
+          ((x)) = 5;
+          (((y))) = 10;
+          ((((z)))) = 11;
+          return ((x)) + (((((y))))) + ((((a)) + (z)));
+        }
+        "
+                )
+                .unwrap()
+        );
+    }
 }
