@@ -1,5 +1,5 @@
 use crate::grammar::*;
-use chumsky::{Parser, prelude::*};
+use chumsky::{Parser, combinator::Repeated, prelude::*, primitive::OneOf};
 
 type ParseError<'src> = extra::Err<Rich<'src, char>>;
 
@@ -33,7 +33,14 @@ const KEYWORDS: &[&str] = &[
     "string",
 ];
 
-const WHITESPACE: &str = " ";
+fn padder() -> Repeated<
+    OneOf<&'static str, &'static str, ParseError<'static>>,
+    char,
+    &'static str,
+    ParseError<'static>,
+> {
+    one_of(" \n\t\r").repeated()
+}
 
 pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, char>> {
     parser().parse(code)
@@ -42,20 +49,20 @@ pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, cha
 fn parser<'src>() -> parser!('src, Program<'src>) {
     just("int")
         .ignored()
-        .then_ignore(just(WHITESPACE).repeated().at_least(1))
+        .then_ignore(padder().at_least(1))
         .then_ignore(just("main"))
-        .then_ignore(just("(").padded())
-        .then_ignore(just(")").padded())
-        .then_ignore(just("{").padded())
+        .then_ignore(just("(").padded_by(padder()))
+        .then_ignore(just(")").padded_by(padder()))
+        .then_ignore(just("{").padded_by(padder()))
         .then(statements_parser())
-        .then_ignore(just("}").padded())
-        .then_ignore(end().padded())
+        .then_ignore(just("}").padded_by(padder()))
+        .then_ignore(end().padded_by(padder()))
         .map(|(_main_type, statements)| Program(statements))
 }
 
 fn statements_parser<'src>() -> parser!('src, Statements<'src>) {
     recursive(|statements_parser| {
-        let none = empty().padded().to(Statements::None);
+        let none = empty().padded_by(padder()).to(Statements::None);
         let statements =
             statement_parser()
                 .boxed()
@@ -78,30 +85,30 @@ fn statement_parser<'src>() -> parser!('src, Statement<'src>) {
         .map(|simp| Statement::Simp(simp));
     let ret = just("return")
         .ignored()
-        .padded()
+        .padded_by(padder())
         .then(exp_parser())
-        .then_ignore(just(';').padded())
+        .then_ignore(just(';').padded_by(padder()))
         .map(|(_, exp)| Statement::Return(exp));
 
-    choice((decl, simp, ret)).padded()
+    choice((decl, simp, ret)).padded_by(padder())
 }
 
 fn decl_parser<'src>() -> parser!('src, Declaration<'src>) {
     let init = just("int")
         .ignored()
-        .padded()
+        .padded_by(padder())
         .then(ident_parser())
-        .then_ignore(just("=").padded())
+        .then_ignore(just("=").padded_by(padder()))
         .then(exp_parser())
         .map(|((_, ident), exp)| Declaration::IdentExp { ident, exp });
 
     let decl = just("int")
         .ignored()
-        .padded()
+        .padded_by(padder())
         .then(ident_parser())
         .map(|(_, ident)| Declaration::Ident(ident));
 
-    choice((init, decl)).padded()
+    choice((init, decl)).padded_by(padder())
 }
 
 fn simp_parser<'src>() -> parser!('src, SimpleInstruction<'src>) {
@@ -115,17 +122,17 @@ fn lvalue_parser<'src>() -> parser!('src, LValue<'src>) {
     recursive(|lvalue_parser| {
         let ident = ident_parser()
             .boxed()
-            .padded()
+            .padded_by(padder())
             .map(|ident| LValue::Ident(ident));
 
         let lvalue = just('(')
             .ignored()
-            .padded()
+            .padded_by(padder())
             .then(lvalue_parser.clone())
-            .then_ignore(just(')').padded())
+            .then_ignore(just(')').padded_by(padder()))
             .map(|(_, lvalue)| LValue::LValue(Box::new(lvalue)));
 
-        choice((ident, lvalue)).padded()
+        choice((ident, lvalue)).padded_by(padder())
     })
 }
 
@@ -133,17 +140,17 @@ fn exp_parser<'src>() -> parser!('src, Expression<'src>) {
     recursive(|exp_parser| {
         let nested_exp = just('(')
             .ignored()
-            .padded()
+            .padded_by(padder())
             .then(exp_parser.clone())
-            .then_ignore(just(')').padded())
+            .then_ignore(just(')').padded_by(padder()))
             .map(|(_, e)| Expression::NestedExp(Box::new(e)));
         let intconst = intconst_parser()
             .boxed()
-            .padded()
+            .padded_by(padder())
             .map(|i| Expression::Intconst(i));
         let ident = ident_parser()
             .boxed()
-            .padded()
+            .padded_by(padder())
             .map(|ident| Expression::Ident(ident));
 
         let prec4 = choice((nested_exp.clone(), intconst.clone(), ident.clone()));
@@ -201,11 +208,11 @@ fn intconst_parser<'src>() -> parser!('src, Intconst<'src>) {
     let dec = decnum_parser().map(|d| Intconst::Decnum(d));
     let hex = hexnum_parser().map(|h| Intconst::Hexnum(h));
 
-    choice((hex, dec)).padded()
+    choice((hex, dec)).padded_by(padder())
 }
 
 fn unop_parser<'src>() -> impl Parser<'src, &'src str, UnOperation, ParseError<'src>> {
-    just('-').to(UnOperation::Minus).padded()
+    just('-').to(UnOperation::Minus).padded_by(padder())
 }
 
 fn asnop_parser<'src>() -> parser!('src, AsNop) {
@@ -254,7 +261,7 @@ fn decnum_parser<'src>() -> parser!('src, Decnum<'src>) {
 
     let just_zero = just("0").map(|z| Decnum(z));
 
-    choice((decnum, just_zero)).padded()
+    choice((decnum, just_zero)).padded_by(padder())
 }
 
 #[rustfmt::skip]
@@ -271,7 +278,7 @@ fn hexnum_parser<'src>() -> parser!('src, Hexnum<'src>) {
             .at_least(1)
         )
         .to_slice()
-        .padded()
+        .padded_by(padder())
         .map(|hexnum| Hexnum(hexnum))
 }
 
@@ -410,25 +417,5 @@ mod tests {
 
     // == sandbox
     #[test]
-    fn sandbox() {
-        panic!(
-            "{:#?}",
-            parser()
-                .parse(
-                    "int main() {
-          int a = 0;
-          int x = 0;
-          int y = 0;
-          int z = 0;
-          (a) = 6;
-          ((x)) = 5;
-          (((y))) = 10;
-          ((((z)))) = 11;
-          return ((x)) + (((((y))))) + ((((a)) + (z)));
-        }
-        "
-                )
-                .unwrap()
-        );
-    }
+    fn sandbox() {}
 }
