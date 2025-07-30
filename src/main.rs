@@ -1,3 +1,4 @@
+mod analyzer;
 mod grammar;
 mod parser;
 
@@ -15,5 +16,9 @@ fn main() {
         }
 
         std::process::exit(42);
+    }
+
+    if analyzer::analyze(result.output().unwrap()).is_err() {
+        std::process::exit(7);
     }
 }

@@ -300,7 +300,7 @@ fn decnum_parser<'src>() -> parser!('src, Decnum<'src>) {
 #[rustfmt::skip]
 fn hexnum_parser<'src>() -> parser!('src, Hexnum<'src>) {
     just('0')
-        .then(one_of("xX"))
+        .ignore_then(one_of("xX").ignored())
         .then(
             choice((
                 one_of('A'..='F'),
@@ -309,10 +309,10 @@ fn hexnum_parser<'src>() -> parser!('src, Hexnum<'src>) {
             )
             .repeated()
             .at_least(1)
+            .to_slice()
         )
-        .to_slice()
         .padded_by(padding())
-        .map(|hexnum| Hexnum(hexnum))
+        .map(|(_, hexnum)| Hexnum(hexnum))
 }
 
 #[cfg(test)]
