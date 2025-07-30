@@ -1,5 +1,5 @@
 use crate::grammar::*;
-use chumsky::{Parser, combinator::Repeated, prelude::*, primitive::OneOf};
+use chumsky::{Parser, prelude::*};
 
 type ParseError<'src> = extra::Err<Rich<'src, char>>;
 
@@ -8,6 +8,8 @@ macro_rules! parser {
         impl Parser<$lifetime, &$lifetime str, $node, ParseError<$lifetime>>
     }
 }
+
+// impl Parser<'src, &'src str, Statements<'src>, ParseError<'src>>;
 
 const KEYWORDS: &[&str] = &[
     "struct",
@@ -33,13 +35,20 @@ const KEYWORDS: &[&str] = &[
     "string",
 ];
 
-fn padder() -> Repeated<
-    OneOf<&'static str, &'static str, ParseError<'static>>,
-    char,
-    &'static str,
-    ParseError<'static>,
-> {
-    one_of(" \n\t\r").repeated()
+fn padding_at_least_once<'src>() -> parser!('src, ()) {
+    one_of(" \n\t\r")
+        .ignored()
+        .or(comment_parser())
+        .repeated()
+        .at_least(1)
+}
+
+fn padding<'src>() -> parser!('src, ()) {
+    one_of(" \n\t\r")
+        .ignored()
+        .or(comment_parser())
+        .repeated()
+        .ignored()
 }
 
 pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, char>> {
@@ -47,22 +56,46 @@ pub fn parse<'src>(code: &'src str) -> ParseResult<Program<'src>, Rich<'src, cha
 }
 
 fn parser<'src>() -> parser!('src, Program<'src>) {
-    just("int")
-        .ignored()
-        .then_ignore(padder().at_least(1))
+    padding()
+        .then_ignore(just("int"))
+        .then_ignore(padding_at_least_once())
         .then_ignore(just("main"))
-        .then_ignore(just("(").padded_by(padder()))
-        .then_ignore(just(")").padded_by(padder()))
-        .then_ignore(just("{").padded_by(padder()))
+        .then_ignore(just("(").padded_by(padding()))
+        .then_ignore(just(")").padded_by(padding()))
+        .then_ignore(just("{").padded_by(padding()))
         .then(statements_parser())
-        .then_ignore(just("}").padded_by(padder()))
-        .then_ignore(end().padded_by(padder()))
+        .then_ignore(just("}").padded_by(padding()))
+        .then_ignore(end().padded_by(padding()))
         .map(|(_main_type, statements)| Program(statements))
+}
+
+fn block_comment<'src>() -> parser!('src, ()) {
+    recursive(|block_comment| {
+        let block_comment_body = any()
+            .and_is(just("/*").not())
+            .and_is(just("*/").not())
+            .ignored();
+
+        just("/*")
+            .ignored()
+            .then_ignore(block_comment_body.or(block_comment).repeated())
+            .then_ignore(just("*/"))
+    })
+}
+
+fn line_comments<'src>() -> parser!('src, ()) {
+    just("//")
+        .ignored()
+        .then_ignore(any().and_is(just("\n").not()).repeated())
+}
+
+fn comment_parser<'src>() -> parser!('src, ()) {
+    choice((block_comment(), line_comments()))
 }
 
 fn statements_parser<'src>() -> parser!('src, Statements<'src>) {
     recursive(|statements_parser| {
-        let none = empty().padded_by(padder()).to(Statements::None);
+        let none = empty().padded_by(padding().boxed()).to(Statements::None);
         let statements =
             statement_parser()
                 .boxed()
@@ -85,30 +118,30 @@ fn statement_parser<'src>() -> parser!('src, Statement<'src>) {
         .map(|simp| Statement::Simp(simp));
     let ret = just("return")
         .ignored()
-        .padded_by(padder())
+        .padded_by(padding())
         .then(exp_parser())
-        .then_ignore(just(';').padded_by(padder()))
+        .then_ignore(just(';').padded_by(padding()))
         .map(|(_, exp)| Statement::Return(exp));
 
-    choice((decl, simp, ret)).padded_by(padder())
+    choice((decl, simp, ret)).padded_by(padding())
 }
 
 fn decl_parser<'src>() -> parser!('src, Declaration<'src>) {
     let init = just("int")
         .ignored()
-        .padded_by(padder())
+        .padded_by(padding())
         .then(ident_parser())
-        .then_ignore(just("=").padded_by(padder()))
+        .then_ignore(just("=").padded_by(padding()))
         .then(exp_parser())
         .map(|((_, ident), exp)| Declaration::IdentExp { ident, exp });
 
     let decl = just("int")
         .ignored()
-        .padded_by(padder())
+        .padded_by(padding())
         .then(ident_parser())
         .map(|(_, ident)| Declaration::Ident(ident));
 
-    choice((init, decl)).padded_by(padder())
+    choice((init, decl)).padded_by(padding())
 }
 
 fn simp_parser<'src>() -> parser!('src, SimpleInstruction<'src>) {
@@ -122,17 +155,17 @@ fn lvalue_parser<'src>() -> parser!('src, LValue<'src>) {
     recursive(|lvalue_parser| {
         let ident = ident_parser()
             .boxed()
-            .padded_by(padder())
+            .padded_by(padding().boxed())
             .map(|ident| LValue::Ident(ident));
 
         let lvalue = just('(')
             .ignored()
-            .padded_by(padder())
+            .padded_by(padding().boxed())
             .then(lvalue_parser.clone())
-            .then_ignore(just(')').padded_by(padder()))
+            .then_ignore(just(')').padded_by(padding().boxed()))
             .map(|(_, lvalue)| LValue::LValue(Box::new(lvalue)));
 
-        choice((ident, lvalue)).padded_by(padder())
+        choice((ident, lvalue)).padded_by(padding().boxed())
     })
 }
 
@@ -140,17 +173,17 @@ fn exp_parser<'src>() -> parser!('src, Expression<'src>) {
     recursive(|exp_parser| {
         let nested_exp = just('(')
             .ignored()
-            .padded_by(padder())
+            .padded_by(padding().boxed())
             .then(exp_parser.clone())
-            .then_ignore(just(')').padded_by(padder()))
+            .then_ignore(just(')').padded_by(padding().boxed()))
             .map(|(_, e)| Expression::NestedExp(Box::new(e)));
         let intconst = intconst_parser()
             .boxed()
-            .padded_by(padder())
+            .padded_by(padding().boxed())
             .map(|i| Expression::Intconst(i));
         let ident = ident_parser()
             .boxed()
-            .padded_by(padder())
+            .padded_by(padding().boxed())
             .map(|ident| Expression::Ident(ident));
 
         let prec4 = choice((nested_exp.clone(), intconst.clone(), ident.clone()));
@@ -208,11 +241,11 @@ fn intconst_parser<'src>() -> parser!('src, Intconst<'src>) {
     let dec = decnum_parser().map(|d| Intconst::Decnum(d));
     let hex = hexnum_parser().map(|h| Intconst::Hexnum(h));
 
-    choice((hex, dec)).padded_by(padder())
+    choice((hex, dec)).padded_by(padding())
 }
 
 fn unop_parser<'src>() -> impl Parser<'src, &'src str, UnOperation, ParseError<'src>> {
-    just('-').to(UnOperation::Minus).padded_by(padder())
+    just('-').to(UnOperation::Minus).padded_by(padding())
 }
 
 fn asnop_parser<'src>() -> parser!('src, AsNop) {
@@ -261,7 +294,7 @@ fn decnum_parser<'src>() -> parser!('src, Decnum<'src>) {
 
     let just_zero = just("0").map(|z| Decnum(z));
 
-    choice((decnum, just_zero)).padded_by(padder())
+    choice((decnum, just_zero)).padded_by(padding())
 }
 
 #[rustfmt::skip]
@@ -278,7 +311,7 @@ fn hexnum_parser<'src>() -> parser!('src, Hexnum<'src>) {
             .at_least(1)
         )
         .to_slice()
-        .padded_by(padder())
+        .padded_by(padding())
         .map(|hexnum| Hexnum(hexnum))
 }
 
@@ -415,7 +448,106 @@ mod tests {
         );
     }
 
+    // == comments
+    #[test]
+    fn block_comments_1_level() {
+        assert_eq!(
+            block_comment().parse("/* hello there */").into_result(),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn block_comments_2_level() {
+        assert_eq!(
+            block_comment()
+                .parse("/* /* hello */ /* there */ */")
+                .into_result(),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn block_comments_doom_level() {
+        assert_eq!(
+            block_comment()
+                .parse("/* :peepoScream: /* hello /* */ */ :peepoNo /* there */ */")
+                .into_result(),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn block_comments_open_too_much() {
+        assert!(block_comment().parse("/* /* no */").into_result().is_err());
+    }
+
+    #[test]
+    fn block_comments_close_too_much() {
+        assert!(block_comment().parse("/* no */ */").into_result().is_err());
+    }
+
+    // == line comments
+    #[test]
+    fn line_comments_simple() {
+        assert_eq!(
+            line_comments().parse("// rofl lmao kekw").into_result(),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn line_comments_nested() {
+        assert_eq!(
+            line_comments().parse("// rofl // lmao kekw").into_result(),
+            Ok(())
+        );
+    }
+
+    // == comment test
+    #[test]
+    fn general_comment_test() {
+        assert!(
+            parser()
+                .parse(
+                    r#"int main() {
+                    // hello there
+                    /*
+                    general kenobi
+                    */
+                    return 0;
+                }"#
+                )
+                .into_result()
+                .is_ok()
+        );
+    }
+
     // == sandbox
     #[test]
-    fn sandbox() {}
+    fn sandbox() {
+        // parser()
+        //     .parse(
+        //         r#"
+        //             /* Welcome to the comment pyramid
+        //               /* *
+        //                 /* **
+        //                   /* ***
+        //                     /* ****
+        //                      /* *****
+        //                      */ *****
+        //                     */ ****
+        //                    */ ***
+        //                 */ **
+        //               */ *
+        //             */
+        //             int main() {
+        //                 return 0;
+        //             }
+        //         "#,
+        //     )
+        //     .into_result()
+        //     .unwrap();
+        parser().parse("int main() { return 0; }").unwrap();
+    }
 }
