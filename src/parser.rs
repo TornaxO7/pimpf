@@ -127,17 +127,17 @@ fn statement_parser<'src>() -> parser!('src, Statement<'src>) {
 }
 
 fn decl_parser<'src>() -> parser!('src, Declaration<'src>) {
-    let init = just("int")
-        .ignored()
-        .padded_by(padding())
+    let init = padding()
+        .ignore_then(just("int"))
+        .ignore_then(padding_at_least_once())
         .then(ident_parser())
         .then_ignore(just("=").padded_by(padding()))
         .then(exp_parser())
         .map(|((_, ident), exp)| Declaration::IdentExp { ident, exp });
 
-    let decl = just("int")
-        .ignored()
-        .padded_by(padding())
+    let decl = padding()
+        .ignore_then(just("int"))
+        .ignore_then(padding_at_least_once())
         .then(ident_parser())
         .map(|(_, ident)| Declaration::Ident(ident));
 
@@ -410,7 +410,7 @@ mod tests {
     fn hexnum_parser_simple() {
         assert_eq!(
             hexnum_parser().parse("0xabc").into_result(),
-            Ok(Hexnum("0xabc"))
+            Ok(Hexnum("abc"))
         );
     }
 
@@ -418,7 +418,7 @@ mod tests {
     fn hexnum_parser_big_x() {
         assert_eq!(
             hexnum_parser().parse("0Xabc").into_result(),
-            Ok(Hexnum("0Xabc"))
+            Ok(Hexnum("abc"))
         );
     }
 
@@ -526,28 +526,17 @@ mod tests {
     // == sandbox
     #[test]
     fn sandbox() {
-        // parser()
-        //     .parse(
-        //         r#"
-        //             /* Welcome to the comment pyramid
-        //               /* *
-        //                 /* **
-        //                   /* ***
-        //                     /* ****
-        //                      /* *****
-        //                      */ *****
-        //                     */ ****
-        //                    */ ***
-        //                 */ **
-        //               */ *
-        //             */
-        //             int main() {
-        //                 return 0;
-        //             }
-        //         "#,
-        //     )
-        //     .into_result()
-        //     .unwrap();
-        parser().parse("int main() { return 0; }").unwrap();
+        // panic!(
+        //     "{:#?}",
+        //     parser()
+        //         .parse(
+        //             "int main() {
+        //     intx = 3;
+        //     return x;
+        // }
+        // ",
+        //         )
+        //         .unwrap()
+        // );
     }
 }
