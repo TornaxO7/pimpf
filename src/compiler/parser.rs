@@ -86,18 +86,8 @@ pub enum Type {
     Int,
 }
 
-pub fn build_ast(tokens: Vec<Spanned<Token>>) -> Result<Program, ()> {
-    let result = program_parser().parse(tokens.split_spanned((0..0).into()));
-
-    if result.has_errors() {
-        for err in result.into_errors() {
-            eprintln!("{:?}", err);
-        }
-
-        return Err(());
-    }
-
-    Ok(result.unwrap())
+pub fn build_ast<'src>(tokens: &'src [Spanned<Token>]) -> ParseResult<Program, Rich<'src, Token>> {
+    program_parser().parse(tokens.split_spanned((0..0).into()))
 }
 
 fn program_parser<'src>() -> Parser!(Program) {

@@ -45,7 +45,27 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
         tokens.unwrap()
     };
 
-    let ast = parser::build_ast(tokens).map_err(|_| Error::Parser)?;
+    let ast = {
+        let ast = parser::build_ast(&tokens);
+
+        if ast.has_errors() {
+            for err in ast.errors() {
+                Report::build(ariadne::ReportKind::Error, 0..src.len())
+                    .with_label(
+                        ariadne::Label::new(err.span().into_range())
+                            .with_message(format!("{:?}", err)),
+                    )
+                    .with_message(format!("Parser error"))
+                    .finish()
+                    .eprint(ariadne::Source::from(src))
+                    .unwrap();
+            }
+
+            return Err(Error::Parser);
+        }
+
+        ast.unwrap()
+    };
 
     Ok(())
 }
