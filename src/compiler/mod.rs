@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 mod lexer;
 mod parser;
 
@@ -10,8 +12,17 @@ pub enum Error {
     Parser,
 }
 
+impl Error {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::Lexer | Self::Parser => 42,
+        }
+    }
+}
+
 pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
     let tokens = lexer::tokenize(src).map_err(|_| Error::Lexer)?;
     let ast = parser::build_ast(tokens).map_err(|_| Error::Parser)?;
-    todo!()
+
+    Ok(())
 }

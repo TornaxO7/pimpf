@@ -1,3 +1,4 @@
+use ariadne::Report;
 use chumsky::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,81 +22,94 @@ pub enum Token {
     Read,
     Alloc,
     AllocArray,
+    // types
     Int,
     Bool,
     Void,
     Char,
     String,
     // Brackets
-    LRound,
-    RRound,
-    LCurly,
-    RCurly,
+    RoundBracketOpen,
+    RoundBracketClose,
+    CurlyBracketOpen,
+    CurlyBracketClose,
     // other
     Semicolon,
     Assign,
-    AssignPlus,
-    AssignMinus,
-    AssignMul,
-    AssignDiv,
-    AssignMod,
+    PlusAssign,
+    MinusAssign,
+    StarAssign,
+    SlashAssign,
+    PercentageAssign,
     Plus,
     Minus,
-    Mul,
-    Div,
-    Mod,
+    Star,
+    Slash,
+    Percentage,
 }
 
-pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Token>, ()> {
+pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Spanned<Token>>, ()> {
     let brackets = {
-        let lround = just('(').to(Token::LRound);
-        let rround = just(')').to(Token::RRound);
-        let lcurly = just('{').to(Token::LCurly);
-        let rcurly = just('}').to(Token::RCurly);
+        let round_bracket_open = just('(').to(Token::RoundBracketOpen).spanned();
+        let round_bracket_close = just(')').to(Token::RoundBracketClose).spanned();
+        let curly_bracket_open = just('{').to(Token::CurlyBracketOpen).spanned();
+        let curly_bracket_close = just('}').to(Token::CurlyBracketClose).spanned();
 
-        choice((lround, rround, lcurly, rcurly))
+        choice((
+            round_bracket_open,
+            round_bracket_close,
+            curly_bracket_open,
+            curly_bracket_close,
+        ))
     };
 
-    let intconst = choice((decnum_parser(), hexnum_parser()));
+    let intconst = choice((decnum_parser().spanned(), hexnum_parser().spanned()));
 
     let asnop = {
-        let assign = just('=').to(Token::Assign);
-        let assign_plus = just("+=").to(Token::AssignPlus);
-        let assign_minus = just("-=").to(Token::AssignMinus);
-        let assign_mul = just("*=").to(Token::AssignMul);
-        let assign_div = just("/=").to(Token::AssignDiv);
-        let assign_mod = just("%=").to(Token::AssignMod);
+        let assign = just('=').to(Token::Assign).spanned();
+        let plus_assign = just("+=").to(Token::PlusAssign).spanned();
+        let minus_assign = just("-=").to(Token::MinusAssign).spanned();
+        let star_assign = just("*=").to(Token::StarAssign).spanned();
+        let slash_assign = just("/=").to(Token::SlashAssign).spanned();
+        let percentage_assign = just("%=").to(Token::PercentageAssign).spanned();
 
         choice((
             assign,
-            assign_plus,
-            assign_minus,
-            assign_mul,
-            assign_div,
-            assign_mod,
+            plus_assign,
+            minus_assign,
+            star_assign,
+            slash_assign,
+            percentage_assign,
         ))
     };
 
     let binop = {
-        let plus = just('+').to(Token::Plus);
-        let minus = just('-').to(Token::Minus);
-        let mul = just('*').to(Token::Mul);
-        let div = just('/').to(Token::Div);
-        let r#mod = just('%').to(Token::Mod);
+        let plus = just('+').to(Token::Plus).spanned();
+        let minus = just('-').to(Token::Minus).spanned();
+        let star = just('*').to(Token::Star).spanned();
+        let slash = just('/').to(Token::Slash).spanned();
+        let percentage = just('%').to(Token::Percentage).spanned();
 
-        choice((plus, minus, mul, div, r#mod))
+        choice((plus, minus, star, slash, percentage))
     };
 
-    let semicolon = just(';').to(Token::Semicolon);
+    let semicolon = just(';').to(Token::Semicolon).spanned();
 
-    let token_parser = choice((ident_parser(), brackets, intconst, asnop, binop, semicolon));
+    let token_parser = choice((
+        ident_parser().spanned(),
+        brackets,
+        intconst,
+        asnop,
+        binop,
+        semicolon,
+    ));
 
     let whitespace = one_of("\t\r\n ").ignored();
     let comment = {
         let newline = one_of("\r\n");
 
         let line_comment = just("//")
-            .ignore_then(any().and_is(newline).not().repeated())
+            .ignore_then(any().and_is(newline.not()).repeated())
             .ignored();
 
         let block_comment = recursive(|comment| {
@@ -112,15 +126,22 @@ pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Token>, ()> {
         line_comment.or(block_comment)
     };
 
-    let result = token_parser
-        .padded_by(choice((comment, whitespace)))
+    let result: ParseResult<Vec<Spanned<Token>>, _> = token_parser
+        .padded_by(choice((comment, whitespace)).repeated().or_not())
         .repeated()
-        .collect::<Vec<Token>>()
+        .collect::<Vec<Spanned<Token>>>()
         .parse(src);
 
     if result.has_errors() {
         for err in result.into_errors() {
-            eprintln!("{}", err);
+            Report::build(ariadne::ReportKind::Error, 0..src.len())
+                .with_label(
+                    ariadne::Label::new(err.span().into_range()).with_message(format!("{}", err)),
+                )
+                .with_message(format!("Lexer error"))
+                .finish()
+                .eprint(ariadne::Source::from(src))
+                .unwrap();
         }
 
         return Err(());
@@ -172,8 +193,8 @@ fn decnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
     let just0 = just('0').to(Token::Intconst(0));
     let non_zero = one_of('1'..='9')
         .then(one_of('0'..='9').repeated().collect::<String>())
-        .map(|(p, s)| format!("{}{}", p, s))
-        .map(|num| Token::Intconst(num.parse().unwrap()));
+        .map(|(p, s)| format!("{}{}", p, s).parse().unwrap())
+        .map(|d| Token::Intconst(d));
 
     just0.or(non_zero)
 }
@@ -188,5 +209,27 @@ fn hexnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
                 .collect::<String>(),
         )
         .map(|hex| u32::from_str_radix(&hex, 16).unwrap())
-        .map(|value| Token::Intconst(value))
+        .map(|hex| Token::Intconst(hex))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sandbox() {
+        // assert_eq!(
+        //     tokenize("int main").unwrap(),
+        //     vec![Token::Int, Token::Ident("main".to_string())]
+        // )
+    }
+
+    mod ident {
+        use super::*;
+
+        #[test]
+        fn int_type() {
+            assert_eq!(ident_parser().parse("int").unwrap(), Token::Int);
+        }
+    }
 }
