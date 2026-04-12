@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 
+use ariadne::Report;
+
 mod lexer;
 mod parser;
 
@@ -21,7 +23,28 @@ impl Error {
 }
 
 pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
-    let tokens = lexer::tokenize(src).map_err(|_| Error::Lexer)?;
+    let tokens = {
+        let tokens = lexer::tokenize(src);
+
+        if tokens.has_errors() {
+            for err in tokens.errors() {
+                Report::build(ariadne::ReportKind::Error, 0..src.len())
+                    .with_label(
+                        ariadne::Label::new(err.span().into_range())
+                            .with_message(format!("{}", err)),
+                    )
+                    .with_message(format!("Lexer error"))
+                    .finish()
+                    .eprint(ariadne::Source::from(src))
+                    .unwrap();
+            }
+
+            return Err(Error::Lexer);
+        }
+
+        tokens.unwrap()
+    };
+
     let ast = parser::build_ast(tokens).map_err(|_| Error::Parser)?;
 
     Ok(())

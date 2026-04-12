@@ -1,4 +1,3 @@
-use ariadne::Report;
 use chumsky::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -48,7 +47,7 @@ pub enum Token {
     Percentage,
 }
 
-pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Spanned<Token>>, ()> {
+pub fn tokenize<'a>(src: &'a str) -> ParseResult<Vec<Spanned<Token>>, Rich<'a, char>> {
     let brackets = {
         let round_bracket_open = just('(').to(Token::RoundBracketOpen).spanned();
         let round_bracket_close = just(')').to(Token::RoundBracketClose).spanned();
@@ -95,7 +94,7 @@ pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Spanned<Token>>, ()> {
 
     let semicolon = just(';').to(Token::Semicolon).spanned();
 
-    let token_parser = choice((
+    let lexer = choice((
         ident_parser().spanned(),
         brackets,
         intconst,
@@ -126,28 +125,11 @@ pub fn tokenize<'a>(src: &'a str) -> Result<Vec<Spanned<Token>>, ()> {
         line_comment.or(block_comment)
     };
 
-    let result: ParseResult<Vec<Spanned<Token>>, _> = token_parser
+    lexer
         .padded_by(choice((comment, whitespace)).repeated().or_not())
         .repeated()
         .collect::<Vec<Spanned<Token>>>()
-        .parse(src);
-
-    if result.has_errors() {
-        for err in result.into_errors() {
-            Report::build(ariadne::ReportKind::Error, 0..src.len())
-                .with_label(
-                    ariadne::Label::new(err.span().into_range()).with_message(format!("{}", err)),
-                )
-                .with_message(format!("Lexer error"))
-                .finish()
-                .eprint(ariadne::Source::from(src))
-                .unwrap();
-        }
-
-        return Err(());
-    }
-
-    Ok(result.unwrap())
+        .parse(src)
 }
 
 fn ident_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char>>> {
