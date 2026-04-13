@@ -3,7 +3,8 @@ use chumsky::prelude::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Ident(String),
-    Intconst(u32),
+    Decnum(String),
+    Hexnum(String),
     // Reserved keywords
     Struct,
     If,
@@ -62,7 +63,7 @@ pub fn tokenize<'a>(src: &'a str) -> ParseResult<Vec<Spanned<Token>>, Rich<'a, c
         ))
     };
 
-    let intconst = choice((decnum_parser().spanned(), hexnum_parser().spanned()));
+    let intconst = choice((hexnum_parser().spanned(), decnum_parser().spanned()));
 
     let asnop = {
         let assign = just('=').to(Token::Assign).spanned();
@@ -172,11 +173,11 @@ fn ident_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'
 }
 
 fn decnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<'src, char>>> {
-    let just0 = just('0').to(Token::Intconst(0));
+    let just0 = just('0').to(Token::Decnum("0".to_string()));
     let non_zero = one_of('1'..='9')
         .then(one_of('0'..='9').repeated().collect::<String>())
-        .map(|(p, s)| format!("{}{}", p, s).parse().unwrap())
-        .map(|d| Token::Intconst(d));
+        .map(|(p, s)| format!("{}{}", p, s))
+        .map(|d| Token::Decnum(d));
 
     just0.or(non_zero)
 }
@@ -190,8 +191,7 @@ fn hexnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
                 .at_least(1)
                 .collect::<String>(),
         )
-        .map(|hex| u32::from_str_radix(&hex, 16).unwrap())
-        .map(|hex| Token::Intconst(hex))
+        .map(|hex| Token::Hexnum(hex))
 }
 
 #[cfg(test)]
@@ -200,10 +200,9 @@ mod tests {
 
     #[test]
     fn sandbox() {
-        // assert_eq!(
-        //     tokenize("int main").unwrap(),
-        //     vec![Token::Int, Token::Ident("main".to_string())]
-        // )
+        let token = tokenize("0xfffffffff").unwrap();
+
+        assert_eq!(token[0].inner, Token::Hexnum("fffffffff".to_string()))
     }
 
     mod ident {

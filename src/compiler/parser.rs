@@ -158,9 +158,23 @@ fn lvalue_parser<'src>() -> Parser!(Lvalue) {
 }
 
 fn exp_parser<'src>() -> Parser!(Exp) {
-    let intconst_ident = select! {
-        Token::Intconst(int) => Exp::Intconst(int),
-        Token::Ident(ident) => Exp::Ident(ident),
+    let intconst_ident = {
+        let decnum =
+            select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
+                Ok(num) => Ok(Exp::Intconst(num)),
+                Err(err) => Err(Rich::custom(span, err.to_string())),
+            });
+
+        let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
+            match u32::from_str_radix(&int, 16) {
+                Ok(num) => Ok(Exp::Intconst(num)),
+                Err(err) => Err(Rich::custom(span, err.to_string())),
+            }
+        });
+
+        let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
+
+        choice((decnum, hexnum, ident))
     };
 
     let nested = recursive(|exp| {
@@ -225,9 +239,9 @@ mod tests {
     #[test]
     fn sandbox() {
         let tokens = [
-            Token::Intconst(69).with_span(SimpleSpan::from(0..1)),
+            Token::Decnum("69".to_string()).with_span(SimpleSpan::from(0..1)),
             Token::Slash.with_span(SimpleSpan::from(1..2)),
-            Token::Intconst(0).with_span(SimpleSpan::from(2..3)),
+            Token::Decnum("0".to_string()).with_span(SimpleSpan::from(2..3)),
         ];
 
         assert_eq!(
