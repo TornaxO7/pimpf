@@ -159,7 +159,7 @@ fn lvalue_parser<'src>() -> Parser!(Lvalue) {
 
 fn exp_parser<'src>() -> Parser!(Exp) {
     recursive(|exp| {
-        let intconst_ident = {
+        let intconst = {
             let decnum =
                 select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
                     Ok(num) => Ok(Exp::Intconst(num)),
@@ -173,10 +173,10 @@ fn exp_parser<'src>() -> Parser!(Exp) {
                 }
             });
 
-            let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
-
-            choice((decnum, hexnum, ident))
+            choice((decnum, hexnum))
         };
+
+        let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
 
         let nested = {
             just(Token::RoundBracketOpen)
@@ -196,7 +196,7 @@ fn exp_parser<'src>() -> Parser!(Exp) {
             })
         };
 
-        let atomic_exp = choice((intconst_ident, nested.clone(), unop.clone()));
+        let atomic_exp = choice((nested.clone(), intconst, ident, unop.clone()));
 
         let binop = {
             let binop = select! {
@@ -218,7 +218,7 @@ fn exp_parser<'src>() -> Parser!(Exp) {
                 })
         };
 
-        choice((binop, atomic_exp))
+        choice((unop.clone(), binop, atomic_exp))
     })
 }
 
