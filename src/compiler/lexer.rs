@@ -127,7 +127,7 @@ pub fn tokenize<'a>(src: &'a str) -> ParseResult<Vec<Spanned<Token>>, Rich<'a, c
     };
 
     lexer
-        .padded_by(choice((comment, whitespace)).repeated().or_not())
+        .padded_by(choice((comment, whitespace)).repeated())
         .repeated()
         .collect::<Vec<Spanned<Token>>>()
         .parse(src)
@@ -200,9 +200,9 @@ mod tests {
 
     #[test]
     fn sandbox() {
-        let token = tokenize("0xfffffffff").unwrap();
+        let tokens = tokenize("int main() { int x = ((((1)))); return 0; }").unwrap();
 
-        assert_eq!(token[0].inner, Token::Hexnum("fffffffff".to_string()))
+        panic!("{:#?}", tokens);
     }
 
     mod ident {

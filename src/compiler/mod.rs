@@ -45,6 +45,8 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
         tokens.unwrap()
     };
 
+    dbg!(&tokens);
+
     let ast = {
         let ast = parser::build_ast(&tokens);
 
@@ -68,4 +70,14 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
     };
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn comptest() {
+        compile("int main() {return a + b + c;}").unwrap();
+    }
 }

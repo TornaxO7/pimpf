@@ -145,78 +145,81 @@ fn simp_parser<'src>() -> Parser!(Simp) {
 }
 
 fn lvalue_parser<'src>() -> Parser!(Lvalue) {
-    let nested = recursive(|lvalue| {
-        just(Token::RoundBracketOpen)
+    recursive(|lvalue| {
+        let nested = just(Token::RoundBracketOpen)
             .ignore_then(lvalue)
             .then_ignore(just(Token::RoundBracketClose))
-            .map(|l| Lvalue::Nested(Box::new(l)))
-    });
+            .map(|l| Lvalue::Nested(Box::new(l)));
 
-    let ident = select! {Token::Ident(i) => Lvalue::Ident(i)};
+        let ident = select! {Token::Ident(i) => Lvalue::Ident(i)};
 
-    choice((ident, nested))
+        choice((ident, nested))
+    })
 }
 
 fn exp_parser<'src>() -> Parser!(Exp) {
-    let intconst_ident = {
-        let decnum =
-            select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
-                Ok(num) => Ok(Exp::Intconst(num)),
-                Err(err) => Err(Rich::custom(span, err.to_string())),
+    recursive(|exp| {
+        let intconst_ident = {
+            let decnum =
+                select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
+                    Ok(num) => Ok(Exp::Intconst(num)),
+                    Err(err) => Err(Rich::custom(span, err.to_string())),
+                });
+
+            let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
+                match u32::from_str_radix(&int, 16) {
+                    Ok(num) => Ok(Exp::Intconst(num)),
+                    Err(err) => Err(Rich::custom(span, err.to_string())),
+                }
             });
 
-        let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
-            match u32::from_str_radix(&int, 16) {
-                Ok(num) => Ok(Exp::Intconst(num)),
-                Err(err) => Err(Rich::custom(span, err.to_string())),
-            }
-        });
+            let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
 
-        let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
-
-        choice((decnum, hexnum, ident))
-    };
-
-    let nested = recursive(|exp| {
-        just(Token::RoundBracketOpen)
-            .ignore_then(exp)
-            .then_ignore(just(Token::RoundBracketClose))
-            .map(|e| Exp::Nested(Box::new(e)))
-    });
-
-    let unop = recursive(|exp| {
-        let unop = select! {
-            Token::Minus => Unop::Minus,
+            choice((decnum, hexnum, ident))
         };
 
-        unop.then(exp.clone()).map(|(op, exp1)| Exp::Unop {
-            op,
-            exp: Box::new(exp1),
-        })
-    });
-
-    let binop = {
-        let exp = choice((intconst_ident, nested.clone(), unop.clone()));
-
-        let binop = select! {
-             Token::Plus => Binop::Plus,
-             Token::Minus => Binop::Minus,
-             Token::Star => Binop::Mult,
-             Token::Slash => Binop::Div,
-             Token::Percentage => Binop::Mod,
+        let nested = {
+            just(Token::RoundBracketOpen)
+                .ignore_then(exp.clone())
+                .then_ignore(just(Token::RoundBracketClose))
+                .map(|e| Exp::Nested(Box::new(e)))
         };
 
-        exp.clone()
-            .then(binop)
-            .then(exp)
-            .map(|((exp1, op), exp2)| Exp::Binop {
-                exp1: Box::new(exp1),
+        let unop = {
+            let unop = select! {
+                Token::Minus => Unop::Minus,
+            };
+
+            unop.then(exp.clone()).map(|(op, exp1)| Exp::Unop {
                 op,
-                exp2: Box::new(exp2),
+                exp: Box::new(exp1),
             })
-    };
+        };
 
-    choice((binop, nested, unop, intconst_ident))
+        let atomic_exp = choice((intconst_ident, nested.clone(), unop.clone()));
+
+        let binop = {
+            let binop = select! {
+                 Token::Plus => Binop::Plus,
+                 Token::Minus => Binop::Minus,
+                 Token::Star => Binop::Mult,
+                 Token::Slash => Binop::Div,
+                 Token::Percentage => Binop::Mod,
+            };
+
+            atomic_exp
+                .clone()
+                .then(binop)
+                .then(choice((exp.clone(), atomic_exp.clone())))
+                .map(|((exp1, op), exp2)| Exp::Binop {
+                    exp1: Box::new(exp1),
+                    op,
+                    exp2: Box::new(exp2),
+                })
+        };
+
+        choice((binop, atomic_exp))
+    })
 }
 
 fn asnop_parser<'src>() -> Parser!(Asnop) {
@@ -232,27 +235,34 @@ fn asnop_parser<'src>() -> Parser!(Asnop) {
 
 #[cfg(test)]
 mod tests {
-    use chumsky::span::SpanWrap;
-
     use super::*;
 
     #[test]
     fn sandbox() {
         let tokens = [
-            Token::Decnum("69".to_string()).with_span(SimpleSpan::from(0..1)),
-            Token::Slash.with_span(SimpleSpan::from(1..2)),
-            Token::Decnum("0".to_string()).with_span(SimpleSpan::from(2..3)),
+            Spanned {
+                inner: Token::Ident("a".to_string()),
+                span: SimpleSpan::new((), 0..1),
+            },
+            Spanned {
+                inner: Token::Plus,
+                span: SimpleSpan::new((), 1..2),
+            },
+            Spanned {
+                inner: Token::Ident("b".to_string()),
+                span: SimpleSpan::new((), 2..3),
+            },
+            Spanned {
+                inner: Token::Plus,
+                span: SimpleSpan::new((), 3..4),
+            },
+            Spanned {
+                inner: Token::Ident("c".to_string()),
+                span: SimpleSpan::new((), 4..5),
+            },
         ];
-
-        assert_eq!(
-            exp_parser()
-                .parse(tokens.as_ref().split_spanned((0..1).into()))
-                .unwrap(),
-            Exp::Binop {
-                exp1: Box::new(Exp::Intconst(69)),
-                op: Binop::Div,
-                exp2: Box::new(Exp::Intconst(0))
-            }
-        );
+        let result = exp_parser()
+            .parse(tokens.as_ref().split_spanned((0..1).into()))
+            .unwrap();
     }
 }
