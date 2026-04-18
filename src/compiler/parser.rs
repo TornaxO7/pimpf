@@ -43,7 +43,8 @@ pub enum Lvalue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Exp {
-    Intconst(u32),
+    Decnum(String),
+    Hexnum(String),
     Ident(Ident),
 
     Add(Box<Self>, Box<Self>),
@@ -157,21 +158,26 @@ fn lvalue_parser<'src>() -> Parser!(Lvalue) {
 
 fn exp_parser<'src>() -> Parser!(Exp) {
     recursive(|exp| {
-        let intconst = {
-            let decnum =
-                select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
-                    Ok(num) => Ok(Exp::Intconst(num)),
-                    Err(err) => Err(Rich::custom(span, err.to_string())),
-                });
+        // let intconst = {
+        //     let decnum =
+        //         select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
+        //             Ok(num) => Ok(Exp::Intconst(num)),
+        //             Err(err) => Err(Rich::custom(span, err.to_string())),
+        //         });
 
-            let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
-                match u32::from_str_radix(&int, 16) {
-                    Ok(num) => Ok(Exp::Intconst(num)),
-                    Err(err) => Err(Rich::custom(span, err.to_string())),
-                }
-            });
+        //     let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
+        //         match u32::from_str_radix(&int, 16) {
+        //             Ok(num) => Ok(Exp::Intconst(num)),
+        //             Err(err) => Err(Rich::custom(span, err.to_string())),
+        //         }
+        //     });
 
-            choice((decnum, hexnum))
+        //     choice((decnum, hexnum))
+        // };
+
+        let intconst = select! {
+            Token::Decnum(dec) => Exp::Decnum(dec),
+            Token::Hexnum(hex) => Exp::Hexnum(hex),
         };
 
         let ident = select!(Token::Ident(ident) => Exp::Ident(ident));

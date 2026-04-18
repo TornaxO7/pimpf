@@ -15,9 +15,12 @@ pub enum Error {
 }
 
 impl Error {
+    pub const REJECTED_BY_LEXER_OR_PARSER: i32 = 42;
+    // pub const SEMANTIC_ANALYSIS: i32 = 7;
+
     pub fn exit_code(&self) -> i32 {
         match self {
-            Self::Lexer | Self::Parser => 42,
+            Self::Lexer | Self::Parser => Self::REJECTED_BY_LEXER_OR_PARSER,
         }
     }
 }
