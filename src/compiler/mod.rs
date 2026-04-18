@@ -67,8 +67,6 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
         ast.unwrap()
     };
 
-    dbg!(ast);
-
     Ok(())
 }
 

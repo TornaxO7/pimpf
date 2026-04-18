@@ -43,18 +43,16 @@ pub enum Lvalue {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Exp {
-    Nested(Box<Exp>),
     Intconst(u32),
     Ident(Ident),
-    Binop {
-        exp1: Box<Self>,
-        op: Binop,
-        exp2: Box<Self>,
-    },
-    Unop {
-        op: Unop,
-        exp: Box<Self>,
-    },
+
+    Add(Box<Self>, Box<Self>),
+    Subtract(Box<Self>, Box<Self>),
+    Multiply(Box<Self>, Box<Self>),
+    Divide(Box<Self>, Box<Self>),
+    Mod(Box<Self>, Box<Self>),
+
+    Neg(Box<Self>),
 }
 
 #[derive(Debug, Clone)]
@@ -67,19 +65,19 @@ pub enum Asnop {
     ModAssign,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Binop {
-    Plus,
-    Minus,
-    Mult,
-    Div,
-    Mod,
-}
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub enum Binop {
+//     Plus,
+//     Minus,
+//     Mult,
+//     Div,
+//     Mod,
+// }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Unop {
-    Minus,
-}
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub enum Unop {
+//     Minus,
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
@@ -178,47 +176,48 @@ fn exp_parser<'src>() -> Parser!(Exp) {
 
         let ident = select!(Token::Ident(ident) => Exp::Ident(ident));
 
-        let nested = {
-            just(Token::RoundBracketOpen)
-                .ignore_then(exp.clone())
-                .then_ignore(just(Token::RoundBracketClose))
-                .map(|e| Exp::Nested(Box::new(e)))
+        let nested = exp.clone().delimited_by(
+            just(Token::RoundBracketOpen),
+            just(Token::RoundBracketClose),
+        );
+
+        let atomic_exp = choice((intconst, ident, nested));
+
+        let op_exp = {
+            let op = |c| just(c);
+
+            // unop
+            let prec1 = op(Token::Minus)
+                .repeated()
+                .foldr(atomic_exp, |_op, rhs| Exp::Neg(Box::new(rhs)));
+
+            // '*', '/', '%'
+            let prec2 = prec1.clone().foldl(
+                choice((
+                    op(Token::Star).to(Exp::Multiply as fn(_, _) -> _),
+                    op(Token::Slash).to(Exp::Divide as fn(_, _) -> _),
+                    op(Token::Percentage).to(Exp::Mod as fn(_, _) -> _),
+                ))
+                .then(prec1)
+                .repeated(),
+                |exp1, (op, exp2)| op(Box::new(exp1), Box::new(exp2)),
+            );
+
+            // '+', '-'
+            let prec3 = prec2.clone().foldl(
+                choice((
+                    op(Token::Plus).to(Exp::Add as fn(_, _) -> _),
+                    op(Token::Minus).to(Exp::Subtract as fn(_, _) -> _),
+                ))
+                .then(prec2)
+                .repeated(),
+                |exp1, (op, exp2)| op(Box::new(exp1), Box::new(exp2)),
+            );
+
+            prec3
         };
 
-        let unop = {
-            let unop = select! {
-                Token::Minus => Unop::Minus,
-            };
-
-            unop.then(exp.clone()).map(|(op, exp1)| Exp::Unop {
-                op,
-                exp: Box::new(exp1),
-            })
-        };
-
-        let atomic_exp = choice((nested.clone(), intconst, ident, unop.clone()));
-
-        let binop = {
-            let binop = select! {
-                 Token::Plus => Binop::Plus,
-                 Token::Minus => Binop::Minus,
-                 Token::Star => Binop::Mult,
-                 Token::Slash => Binop::Div,
-                 Token::Percentage => Binop::Mod,
-            };
-
-            atomic_exp
-                .clone()
-                .then(binop)
-                .then(choice((exp.clone(), atomic_exp.clone())))
-                .map(|((exp1, op), exp2)| Exp::Binop {
-                    exp1: Box::new(exp1),
-                    op,
-                    exp2: Box::new(exp2),
-                })
-        };
-
-        choice((unop.clone(), binop, atomic_exp))
+        op_exp
     })
 }
 
