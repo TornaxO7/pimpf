@@ -30,15 +30,9 @@ pub struct Declaration {
 
 #[derive(Debug, Clone)]
 pub struct Simp {
-    pub lvalue: Lvalue,
+    pub lvalue: Ident,
     pub asnop: Asnop,
     pub exp: Exp,
-}
-
-#[derive(Debug, Clone)]
-pub enum Lvalue {
-    Ident(Ident),
-    Nested(Box<Lvalue>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,23 +131,15 @@ fn decl_parser<'src>() -> Parser!(Declaration) {
 }
 
 fn simp_parser<'src>() -> Parser!(Simp) {
-    lvalue_parser()
+    let lvalue_parser = select!(Token::Ident(i) => i).delimited_by(
+        just(Token::RoundBracketOpen),
+        just(Token::RoundBracketClose),
+    );
+
+    lvalue_parser
         .then(asnop_parser())
         .then(exp_parser())
         .map(|((lvalue, asnop), exp)| Simp { lvalue, asnop, exp })
-}
-
-fn lvalue_parser<'src>() -> Parser!(Lvalue) {
-    recursive(|lvalue| {
-        let nested = just(Token::RoundBracketOpen)
-            .ignore_then(lvalue)
-            .then_ignore(just(Token::RoundBracketClose))
-            .map(|l| Lvalue::Nested(Box::new(l)));
-
-        let ident = select! {Token::Ident(i) => Lvalue::Ident(i)};
-
-        choice((ident, nested))
-    })
 }
 
 fn exp_parser<'src>() -> Parser!(Exp) {
