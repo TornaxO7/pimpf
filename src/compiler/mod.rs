@@ -4,6 +4,7 @@ use ariadne::Report;
 
 mod lexer;
 mod parser;
+mod semantic_analyzer;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -12,15 +13,19 @@ pub enum Error {
 
     #[error("An error occured during parsing.")]
     Parser,
+
+    #[error("{0}")]
+    SemanticAnalyzer(semantic_analyzer::Error),
 }
 
 impl Error {
     pub const REJECTED_BY_LEXER_OR_PARSER: i32 = 42;
-    // pub const SEMANTIC_ANALYSIS: i32 = 7;
+    pub const SEMANTIC_ANALYSIS: i32 = 7;
 
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::Lexer | Self::Parser => Self::REJECTED_BY_LEXER_OR_PARSER,
+            Self::SemanticAnalyzer(_) => Self::SEMANTIC_ANALYSIS,
         }
     }
 }
@@ -69,6 +74,8 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
 
         ast.unwrap()
     };
+
+    semantic_analyzer::analyze(&ast).map_err(Error::SemanticAnalyzer)?;
 
     Ok(())
 }
