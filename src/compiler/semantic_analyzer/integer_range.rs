@@ -7,14 +7,14 @@ pub fn check(ast: &Program) -> Result<(), Error> {
             if decnum.parse::<u32>().is_ok() {
                 Ok(())
             } else {
-                Err(Error::InvalidDecnum(decnum.clone()))
+                Err(Error::InvalidIntconst(decnum.clone()))
             }
         }
         Exp::Hexnum(hexnum) => {
             if u32::from_str_radix(hexnum.as_str(), 16).is_ok() {
                 Ok(())
             } else {
-                Err(Error::InvalidHexnum(hexnum.clone()))
+                Err(Error::InvalidIntconst(format!("0x{}", hexnum.clone())))
             }
         }
         _ => Ok(()),
