@@ -60,20 +60,6 @@ pub enum Asnop {
     ModAssign,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub enum Binop {
-//     Plus,
-//     Minus,
-//     Mult,
-//     Div,
-//     Mod,
-// }
-
-// #[derive(Debug, Clone, PartialEq, Eq)]
-// pub enum Unop {
-//     Minus,
-// }
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Int,
@@ -131,10 +117,15 @@ fn decl_parser<'src>() -> Parser!(Declaration) {
 }
 
 fn simp_parser<'src>() -> Parser!(Simp) {
-    let lvalue_parser = select!(Token::Ident(i) => i).delimited_by(
-        just(Token::RoundBracketOpen),
-        just(Token::RoundBracketClose),
-    );
+    let lvalue_parser = recursive(|nested| {
+        let ident = select!(Token::Ident(i) => i);
+
+        let nes = just(Token::RoundBracketOpen)
+            .ignore_then(nested.clone())
+            .then_ignore(just(Token::RoundBracketClose));
+
+        choice((ident, nes))
+    });
 
     lvalue_parser
         .then(asnop_parser())
@@ -144,23 +135,6 @@ fn simp_parser<'src>() -> Parser!(Simp) {
 
 fn exp_parser<'src>() -> Parser!(Exp) {
     recursive(|exp| {
-        // let intconst = {
-        //     let decnum =
-        //         select!(Token::Decnum(int) => int).try_map(|int, span| match int.parse::<u32>() {
-        //             Ok(num) => Ok(Exp::Intconst(num)),
-        //             Err(err) => Err(Rich::custom(span, err.to_string())),
-        //         });
-
-        //     let hexnum = select!(Token::Hexnum(int) => int).try_map(|int, span| {
-        //         match u32::from_str_radix(&int, 16) {
-        //             Ok(num) => Ok(Exp::Intconst(num)),
-        //             Err(err) => Err(Rich::custom(span, err.to_string())),
-        //         }
-        //     });
-
-        //     choice((decnum, hexnum))
-        // };
-
         let intconst = select! {
             Token::Decnum(dec) => Exp::Decnum(dec),
             Token::Hexnum(hex) => Exp::Hexnum(hex),

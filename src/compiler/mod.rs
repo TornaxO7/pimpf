@@ -14,7 +14,7 @@ pub enum Error {
     #[error("An error occured during parsing.")]
     Parser,
 
-    #[error("{0}")]
+    #[error("Semantic error: {0}")]
     SemanticAnalyzer(semantic_analyzer::Error),
 }
 
