@@ -1,20 +1,7 @@
+use super::Error;
 use crate::compiler::parser::*;
 
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Invalid decnum: {0}")]
-    InvalidDecnum(String),
-
-    #[error("Invalid hexnum: {0}")]
-    InvalidHexnum(String),
-}
-
-pub fn analyze(ast: &Program) -> Result<(), Error> {
-    check_integer_range(ast)?;
-    Ok(())
-}
-
-fn check_integer_range(ast: &Program) -> Result<(), Error> {
+pub fn check(ast: &Program) -> Result<(), Error> {
     let is_valid = |exp: &Exp| match exp {
         Exp::Decnum(decnum) => {
             if decnum.parse::<u32>().is_ok() {
