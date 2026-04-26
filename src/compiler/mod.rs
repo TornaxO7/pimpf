@@ -53,6 +53,8 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
         tokens.unwrap()
     };
 
+    // dbg!(&tokens);
+
     let ast = {
         let ast = parser::build_ast(&tokens);
 

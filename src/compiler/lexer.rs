@@ -105,28 +105,23 @@ pub fn tokenize<'a>(src: &'a str) -> ParseResult<Vec<Spanned<Token>>, Rich<'a, c
     ));
 
     let whitespace = one_of("\t\r\n ").to_slice().ignored();
-    let comment = {
+    let block_comment = recursive(|block_comment| {
+        let prefix = just("/*");
+        let suffix = just("*/");
+        let body = any().and_is(suffix.not()).repeated().ignored();
+
+        prefix.then(block_comment.or(body)).then(suffix).ignored()
+    });
+
+    let line_comment = {
         let newline = one_of("\r\n");
-
-        let line_comment = just("//")
+        just("//")
             .then(any().and_is(newline.not()).repeated())
-            .ignored();
-
-        let block_comment = recursive(|block_comment| {
-            let prefix = just("/*").ignored();
-            let suffix = just("*/").ignored();
-            let body = any().and_is(suffix.not()).ignored();
-
-            body.or(block_comment)
-                .repeated()
-                .delimited_by(prefix, suffix)
-        });
-
-        line_comment.or(block_comment)
+            .ignored()
     };
 
     lexer
-        .padded_by((comment.or(whitespace)).repeated())
+        .padded_by(choice((block_comment, line_comment, whitespace)).repeated())
         .repeated()
         .collect::<Vec<Spanned<Token>>>()
         .parse(src)
