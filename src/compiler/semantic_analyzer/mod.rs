@@ -1,5 +1,5 @@
-mod integer_range;
-mod main_has_return;
+mod constants_checking;
+mod return_checking;
 
 use crate::compiler::parser::Program;
 
@@ -16,8 +16,8 @@ pub enum Error {
 }
 
 pub fn analyze(ast: &Program) -> Result<(), Error> {
-    integer_range::check(ast)?;
-    main_has_return::check(ast)?;
+    return_checking::check(ast)?;
+    constants_checking::check(ast)?;
 
     Ok(())
 }
