@@ -56,18 +56,9 @@ impl<'a> Analyzer<'a> {
             return Err(Error::NotDeclared(simp.lvalue.clone()));
         };
 
-        match simp.asnop {
-            Asnop::Assign => {}
-            Asnop::PlusAssign
-            | Asnop::MinusAssign
-            | Asnop::MulAssign
-            | Asnop::DivAssign
-            | Asnop::ModAssign => {
-                if *state != State::Initialised {
-                    return Err(Error::NotInitialised(simp.lvalue.clone()));
-                }
-            }
-        };
+        if *state != State::Initialised {
+            return Err(Error::NotInitialised(simp.lvalue.clone()));
+        }
 
         self.vars.insert(simp.lvalue.as_str(), State::Initialised);
         self.process_exp(&simp.exp)
