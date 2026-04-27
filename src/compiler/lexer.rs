@@ -108,9 +108,12 @@ pub fn tokenize<'a>(src: &'a str) -> ParseResult<Vec<Spanned<Token>>, Rich<'a, c
     let block_comment = recursive(|block_comment| {
         let prefix = just("/*");
         let suffix = just("*/");
-        let body = any().and_is(suffix.not()).repeated().ignored();
+        let body = any().and_is(prefix.or(suffix).not()).ignored();
 
-        prefix.then(block_comment.or(body)).then(suffix).ignored()
+        prefix
+            .then(block_comment.or(body).repeated())
+            .then(suffix)
+            .ignored()
     });
 
     let line_comment = {
