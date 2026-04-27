@@ -1,5 +1,3 @@
-// #![allow(unused_variables)]
-
 use ariadne::Report;
 
 mod lexer;
