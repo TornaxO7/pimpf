@@ -174,7 +174,7 @@ fn decnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
     let non_zero = one_of('1'..='9')
         .then(one_of('0'..='9').repeated().collect::<String>())
         .map(|(p, s)| format!("{}{}", p, s))
-        .map(|d| Token::Decnum(d));
+        .map(Token::Decnum);
 
     just0.or(non_zero)
 }
@@ -188,7 +188,7 @@ fn hexnum_parser<'src>() -> impl Parser<'src, &'src str, Token, extra::Err<Rich<
                 .at_least(1)
                 .collect::<String>(),
         )
-        .map(|hex| Token::Hexnum(hex))
+        .map(Token::Hexnum)
 }
 
 #[cfg(test)]

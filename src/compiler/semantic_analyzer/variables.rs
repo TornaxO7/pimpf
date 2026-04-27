@@ -39,7 +39,6 @@ impl<'a> Analyzer<'a> {
             return Err(Error::AlreadyDeclared(decl.ident.clone()));
         }
 
-        let only_decl = decl.exp.is_none();
         let state = if let Some(exp) = &decl.exp {
             self.process_exp(exp)?;
             State::Initialised
@@ -70,11 +69,11 @@ impl<'a> Analyzer<'a> {
             Exp::Ident(ident) => {
                 if let Some(state) = self.vars.get(ident.as_str()) {
                     match state {
-                        State::Declared => return Err(Error::NotInitialised(ident.clone())),
+                        State::Declared => Err(Error::NotInitialised(ident.clone())),
                         State::Initialised => Ok(()),
                     }
                 } else {
-                    return Err(Error::UnknownVariable(ident.clone()));
+                    Err(Error::UnknownVariable(ident.clone()))
                 }
             }
             Exp::Add(a, b)

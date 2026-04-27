@@ -1,4 +1,4 @@
-#![allow(unused_variables)]
+// #![allow(unused_variables)]
 
 use ariadne::Report;
 
@@ -30,7 +30,7 @@ impl Error {
     }
 }
 
-pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
+pub fn compile(src: &str) -> Result<(), Error> {
     let tokens = {
         let tokens = lexer::tokenize(src);
 
@@ -41,7 +41,7 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
                         ariadne::Label::new(err.span().into_range())
                             .with_message(format!("{}", err)),
                     )
-                    .with_message(format!("Lexer error"))
+                    .with_message("Lexer error".to_string())
                     .finish()
                     .eprint(ariadne::Source::from(src))
                     .unwrap();
@@ -65,7 +65,7 @@ pub fn compile<'a>(src: &'a str) -> Result<(), Error> {
                         ariadne::Label::new(err.span().into_range())
                             .with_message(format!("{:?}", err)),
                     )
-                    .with_message(format!("Parser error"))
+                    .with_message("Parser error".to_string())
                     .finish()
                     .eprint(ariadne::Source::from(src))
                     .unwrap();

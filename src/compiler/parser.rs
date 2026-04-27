@@ -86,6 +86,7 @@ fn program_parser<'src>() -> Parser!(Program) {
         })
 }
 
+#[allow(clippy::let_and_return)]
 fn type_parser<'src>() -> Parser!(Type) {
     let int = just(Token::Int).to(Type::Int);
 
@@ -95,16 +96,16 @@ fn type_parser<'src>() -> Parser!(Type) {
 fn statement_parser<'src>() -> Parser!(Statement) {
     let decl = decl_parser()
         .then_ignore(just(Token::Semicolon))
-        .map(|decl| Statement::Decl(decl));
+        .map(Statement::Decl);
 
     let simp = simp_parser()
         .then_ignore(just(Token::Semicolon))
-        .map(|simp| Statement::Simp(simp));
+        .map(Statement::Simp);
 
     let ret = just(Token::Return)
         .ignore_then(exp_parser())
         .then_ignore(just(Token::Semicolon))
-        .map(|exp| Statement::Return(exp));
+        .map(Statement::Return);
 
     choice((decl, simp, ret))
 }
@@ -149,7 +150,7 @@ fn exp_parser<'src>() -> Parser!(Exp) {
 
         let atomic_exp = choice((intconst, ident, nested));
 
-        let op_exp = {
+        {
             let op = |c| just(c);
 
             // unop
@@ -170,7 +171,7 @@ fn exp_parser<'src>() -> Parser!(Exp) {
             );
 
             // '+', '-'
-            let prec3 = prec2.clone().foldl(
+            prec2.clone().foldl(
                 choice((
                     op(Token::Plus).to(Exp::Add as fn(_, _) -> _),
                     op(Token::Minus).to(Exp::Subtract as fn(_, _) -> _),
@@ -178,12 +179,8 @@ fn exp_parser<'src>() -> Parser!(Exp) {
                 .then(prec2)
                 .repeated(),
                 |exp1, (op, exp2)| op(Box::new(exp1), Box::new(exp2)),
-            );
-
-            prec3
-        };
-
-        op_exp
+            )
+        }
     })
 }
 
