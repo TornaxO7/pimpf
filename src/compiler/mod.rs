@@ -3,6 +3,7 @@ use ariadne::Report;
 mod lexer;
 mod parser;
 mod semantic_analyzer;
+mod ssa;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -76,6 +77,7 @@ pub fn compile(src: &str) -> Result<(), Error> {
     };
 
     semantic_analyzer::analyze(&ast).map_err(Error::SemanticAnalyzer)?;
+    let ssa_tree = ssa::build(ast);
 
     Ok(())
 }
